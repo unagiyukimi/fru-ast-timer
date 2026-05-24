@@ -280,7 +280,12 @@ function getBurstState(){
 function setNextNameSize(name){
   const el=q("nextName");
   const len=name.length;
-  el.style.fontSize=len>28?"20px":len>22?"24px":len>16?"32px":len>10?"42px":"";
+  el.style.fontSize =
+    len > 28 ? "20px" :
+    len > 22 ? "24px" :
+    len > 16 ? "30px" :
+    len > 10 ? "34px" :
+    "38px";
 }
 
 function render(){
