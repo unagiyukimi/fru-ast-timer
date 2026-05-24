@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>絶エデン AST カンペツール</title>
+<style>
+:root{
+  --panel:#17102f;--panel2:#231543;--line:rgba(246,211,101,.32);
+  --text:#fffaf0;--muted:#c9bfd8;--gold:#f6d365;--whiteGold:#fff4c7;--purple:#6d4cff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:
+    radial-gradient(circle at 50% 8%,rgba(255,244,199,.55),transparent 22%),
+    radial-gradient(circle at 25% 22%,rgba(255,255,255,.22),transparent 28%),
+    radial-gradient(circle at 80% 72%,rgba(255,244,199,.18),transparent 30%),
+    linear-gradient(180deg,#faf6ea 0%,#f2ead8 46%,#e7dcc8 100%);
+}
+.wrap{max-width:1180px;margin:auto;padding:20px}
+h1{margin:0;text-align:center;font-size:clamp(22px,4vw,34px);color:#24143f;text-shadow:0 1px 0 rgba(255,255,255,.8)}
+.sub{text-align:center;color:#4a3a5c;margin:6px 0 16px;font-weight:700}
+.panel,.hudBox{background:linear-gradient(160deg,var(--panel),var(--panel2) 58%,#120b22);border:1px solid var(--line);box-shadow:0 14px 34px rgba(20,8,45,.32)}
+.panel{border-radius:22px;padding:14px;margin:12px 0}.hudBox{border-radius:18px;padding:12px}
+.badge{display:inline-block;background:#31236a;color:var(--whiteGold);border-radius:10px;padding:5px 14px;font-weight:900}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+button{color:white;background:#17102f;border:1px solid var(--line);border-radius:14px;padding:11px 16px;font-weight:900;cursor:pointer}
+button.primary{background:linear-gradient(135deg,#6d4cff,#f6d365);color:#120b22}
+.count{height:44px;text-align:center;color:#24143f;font-size:38px;font-weight:900}
+.hud{display:grid;grid-template-columns:110px 3fr 1.35fr;gap:12px;align-items:stretch}
+.hudLabel{color:var(--muted);font-size:13px;font-weight:900}
+.phaseBox{text-align:center;display:flex;flex-direction:column;justify-content:center}.phaseBox .badge{font-size:22px}
+.nextHud{position:relative;overflow:hidden;border-color:rgba(255,244,199,.72);background:radial-gradient(circle at 78% 50%,rgba(246,211,101,.11),transparent 30%),linear-gradient(150deg,#24143f,#17102f 65%,#120b22);box-shadow:0 0 22px rgba(246,211,101,.22),inset 0 0 0 1px rgba(255,244,199,.12);transform-style:preserve-3d;min-height:260px;max-height:260px}
+.nextHud::before{content:"";position:absolute;right:22px;top:50%;width:220px;height:220px;border-radius:50%;border:1px solid rgba(255,244,199,.20);box-shadow:0 0 26px rgba(255,244,199,.12),inset 0 0 26px rgba(109,76,255,.18);transform:translateY(-50%);pointer-events:none;opacity:.65}
+.nextHud::after{content:"";position:absolute;right:58px;top:50%;width:142px;height:142px;border-radius:50%;border:1px dashed rgba(246,211,101,.22);transform:translateY(-50%);pointer-events:none;opacity:.65;animation:ringSpin 26s linear infinite}
+.nextHud.flip{animation:nextFlip 1.35s cubic-bezier(.16,.84,.24,1) both}
+.nextContent{position:relative;z-index:1}
+.nextName{font-size:clamp(20px,4vw,52px);font-weight:950;margin:4px 0;line-height:1.05;height:2.2em;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.nextMeta{color:var(--muted);font-size:14px}
+.nextAst{color:var(--gold);font-weight:900;font-size:20px;margin-top:6px}
+.enemyCountdown{font-family:monospace;font-size:clamp(42px,8vw,78px);font-weight:950;color:var(--gold);line-height:1}
+.enemyCountdown.urgent{color:#fff1a8;text-shadow:0 0 16px rgba(246,211,101,.65)}
+.bar{height:7px;background:#1a1832;border-radius:999px;overflow:hidden;margin-top:10px}.bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--whiteGold),var(--purple))}
+.elapsedMini{margin-top:6px;color:var(--muted);font-size:12px;text-align:center}
+.burstHud{display:flex;flex-direction:column;justify-content:center;text-align:center;transition:.25s ease;background:linear-gradient(160deg,#2b1650,#17102f)}
+.burstTime{font-family:monospace;font-size:clamp(30px,4vw,48px);color:var(--gold);font-weight:950}
+.burstHud.preBurst{border-color:var(--gold);box-shadow:0 0 22px rgba(246,211,101,.38)}
+.burstHud.preBurst .hudLabel{color:var(--gold)}
+.burstHud.preBurst .burstTime{font-size:clamp(44px,6vw,72px);color:var(--gold);text-shadow:0 0 16px rgba(246,211,101,.65)}
+.burstHud.burstNow{border-color:var(--gold);background:linear-gradient(160deg,#2b1650,#17102f);box-shadow:0 0 22px rgba(246,211,101,.38)}
+.burstHud.burstNow .hudLabel{color:var(--gold)}
+.burstHud.burstNow .burstTime{font-size:clamp(42px,6vw,76px);color:#fff1a8;text-shadow:0 0 18px rgba(246,211,101,.8);animation:burstPulse 1.2s ease-in-out infinite}
+.burstSub{color:var(--muted);font-size:13px}
+.nowCard{border:1px solid rgba(255,244,199,.34);border-radius:18px;padding:14px 18px;background:linear-gradient(150deg,#17102f,#120b22)}
+.nowGrid{display:grid;grid-template-columns:100px 1fr 1.5fr;gap:14px;align-items:center}
+.nowTime{color:var(--gold);font-family:monospace;font-size:24px;font-weight:900;text-align:center}
+.nowName{font-size:22px;font-weight:900}.ast{color:var(--gold);font-weight:900}.small{color:var(--muted);font-size:13px}
+.sectionTitle{font-size:22px;font-weight:900;margin-bottom:12px}
+.timeline{display:grid;gap:8px}
+.item{display:grid;grid-template-columns:78px 72px 1fr 130px;gap:12px;align-items:center;border:1px solid rgba(109,76,255,.24);background:#17102f;border-radius:14px;padding:11px}
+.item.now{border-color:var(--whiteGold);background:rgba(255,244,199,.12)}.item.next{border-color:var(--purple);background:rgba(109,76,255,.16)}
+.t{font-family:monospace;font-size:21px;font-weight:900}.name{font-weight:900;font-size:17px}
+textarea{width:100%;height:58px;min-height:48px;max-height:110px;resize:vertical;border-radius:14px;border:1px solid var(--line);background:#070b14;color:var(--text);padding:8px 10px;font-family:monospace;font-size:12px;line-height:1.3}
+@keyframes nextFlip{0%{transform:rotateX(68deg) scale(.985);filter:brightness(.88)}55%{transform:rotateX(-3deg) scale(1.015);filter:brightness(1.2)}100%{transform:rotateX(0) scale(1);filter:brightness(1)}}
+@keyframes ringSpin{to{transform:translateY(-50%) rotate(360deg)}}
+@keyframes burstPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+@media(max-width:820px){
+  .hud{grid-template-columns:1fr}.nextHud{min-height:270px;max-height:none}.nowGrid{grid-template-columns:1fr;text-align:center}
+  .item{grid-template-columns:70px 58px 1fr}.item .small:last-child{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>絶エデン解析戦：再生編</h1>
+  <div class="sub">占星術師（AST）カンペツール / NEXT中心HUD</div>
+
+  <section class="hud">
+    <div class="hudBox phaseBox">
+      <div class="hudLabel">PHASE</div>
+      <span id="phase" class="badge">P1</span>
+    </div>
+
+    <div class="hudBox nextHud" id="nextHud">
+      <div class="nextContent">
+        <div class="hudLabel">NEXT ENEMY ACTION</div>
+        <div id="nextName" class="nextName">-</div>
+        <div id="nextMeta" class="nextMeta">-</div>
+        <div id="nextAst" class="nextAst">AST: -</div>
+        <div id="enemyCountdown" class="enemyCountdown">--:--</div>
+        <div class="bar"><div id="bar"></div></div>
+        <div id="elapsedMini" class="elapsedMini">経過 00:00 / 00:00</div>
+      </div>
+    </div>
+
+    <div class="hudBox burstHud" id="burstHud">
+      <div class="hudLabel" id="burstLabel">BURST</div>
+      <div id="burstTime" class="burstTime">READY</div>
+      <div id="burstSub" class="burstSub">開始前</div>
+    </div>
+  </section>
+
+  <div class="count" id="count"></div>
+
+  <div class="row">
+    <button class="primary" id="start">▶ 開始</button>
+    <button id="pause">Ⅱ 一時停止</button>
+    <button id="reset">↻ リセット</button>
+    <button id="back">◀ -5秒</button>
+    <button id="forward">▶ +5秒</button>
+  </div>
+
+  <section class="panel">
+    <div class="sectionTitle">現在</div>
+    <div id="currentCard"></div>
+  </section>
+
+  <section class="panel">
+    <div class="sectionTitle">タイムライン</div>
+    <div class="timeline" id="timeline"></div>
+  </section>
+
+  <section class="panel">
+    <div class="sectionTitle">データ編集</div>
+    <textarea id="json"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button id="apply">反映</button>
+      <button id="save">保存</button>
+      <button id="default">初期データへ戻す</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const START_AT = 0;
+let hasStarted = false;
+
+const burstTimeline=[
+ {t:0,label:"開幕"},
+ {t:120,label:"2分"},
+ {t:240,label:"4分"},
+ {t:365,label:"6分 / P2.5明け"},
+ {t:480,label:"8分 / P3"},
+ {t:600,label:"10分 / P4前"},
+ {t:720,label:"12分 / 時間結晶後"},
+ {t:865,label:"P5開幕調整"},
+ {t:960,label:"P5 16分"},
+ {t:1080,label:"最終"}
+];
+
+const defaultTimeline=[
+ {t:0,phase:"P1",name:"戦闘開始 / 開幕バースト",ast:"ディヴィネーション / カード配布 / コンバガ",note:"開幕"},
+ {t:15,phase:"P1",name:"サイクロニックブレイク",ast:"軽減確認 / アスペクト・ヘリオス準備",note:""},
+ {t:17,phase:"P1",name:"シンフレイム or シンボルト + サイクロニック3回",ast:"範囲戻し",note:"密集処理"},
+ {t:24,phase:"P1",name:"連鎖爆印刻",ast:"タンク単体ケア",note:""},
+ {t:35,phase:"P1",name:"楽園絶技",ast:"アーサリースター候補",note:""},
+ {t:41,phase:"P1",name:"爆印",ast:"着弾後戻し",note:""},
+ {t:49,phase:"P1",name:"ブラスティングゾーン",ast:"単体ケア",note:""},
+ {t:50,phase:"P1",name:"シンファイガ",ast:"軽減確認",note:""},
+ {t:56,phase:"P1",name:"サイクロニックブレイク連続",ast:"範囲戻し準備",note:"58秒セット込み"},
+ {t:64,phase:"P1",name:"転輪召 / バーンストライク連続",ast:"移動優先 / HoT維持",note:"1:04〜1:13圧縮"},
+ {t:75,phase:"P1",name:"シンソイルスラスト",ast:"単体ケア",note:""},
+ {t:79,phase:"P1",name:"シンフレイム",ast:"範囲戻し",note:""},
+ {t:86,phase:"P1",name:"光焔光背",ast:"軽減 / アスペクト・ヘリオス",note:""},
+ {t:102,phase:"P1",name:"シンソイルセヴァー",ast:"エグザルテーション候補",note:""},
+ {t:120,phase:"P1",name:"2分バースト",ast:"ディヴィネーション / カード配布",note:""},
+ {t:122,phase:"P1",name:"光焔光背",ast:"戻し厚め",note:""},
+ {t:130,phase:"P1",name:"連鎖爆印刻",ast:"タンクケア",note:""},
+ {t:142,phase:"P1",name:"バーンストライク処理",ast:"軽減確認",note:"ブラスト/アウト/爆印込み"},
+ {t:155,phase:"Phase",name:"P2開始",ast:"MP確認 / カード準備",note:"フェーズ切替"},
+
+ {t:172,phase:"P2",name:"クアドラスラップ×2",ast:"タンク強ケア",note:""},
+ {t:185,phase:"P2",name:"鏡写し",ast:"移動準備",note:""},
+ {t:192,phase:"P2",name:"ダイアモンドダスト",ast:"アーサリースター候補",note:""},
+ {t:202,phase:"P2",name:"光の津波 + キック",ast:"軽減確認",note:""},
+ {t:204,phase:"P2",name:"氷連続処理",ast:"範囲戻し / HoT維持",note:"3:24〜3:34圧縮"},
+ {t:220,phase:"P2",name:"フロストアーマー or ブライトアーマー",ast:"単体確認",note:""},
+ {t:240,phase:"P2",name:"4分バースト / ホーリーレイ",ast:"ディヴィネーション / カード配布 / 範囲戻し",note:""},
+ {t:250,phase:"P2",name:"鏡の国",ast:"移動確認",note:""},
+ {t:264,phase:"P2",name:"サイスキック + 光の津波×2",ast:"範囲戻し",note:""},
+ {t:280,phase:"P2",name:"バニシュガ系",ast:"軽減確認",note:""},
+ {t:289,phase:"P2",name:"光の暴走",ast:"ニュートラルセクト候補",note:""},
+ {t:297,phase:"P2",name:"ルミナスイロード連続 / 浸食光",ast:"継続戻し",note:"4:57〜5:02圧縮"},
+ {t:318,phase:"P2",name:"バニシュガ系",ast:"範囲戻し",note:""},
+ {t:327,phase:"P2",name:"光の津波",ast:"軽減確認",note:""},
+ {t:347,phase:"P2.5",name:"絶対零度",ast:"事前HoT / 軽減",note:""},
+ {t:349,phase:"P2.5",name:"凍波",ast:"凍結確認",note:""},
+ {t:381,phase:"P2.5",name:"シンブリザガ / ハイマルストーム連続",ast:"MP温存 / 必要分だけ戻し",note:"6:21〜6:37圧縮"},
+ {t:416,phase:"Phase",name:"P3開始",ast:"カード準備",note:"フェーズ切替"},
+
+ {t:424,phase:"P3",name:"ジャンクション実行",ast:"DoT更新準備",note:""},
+ {t:427,phase:"P3",name:"シヴァ・ミトロンからの攻撃",ast:"範囲戻し",note:""},
+ {t:442,phase:"P3",name:"ヘル・ジャッジメント",ast:"HP戻し優先",note:""},
+ {t:457,phase:"P3",name:"時間圧縮・絶",ast:"マクロコスモス候補",note:""},
+ {t:469,phase:"P3",name:"時間圧縮処理",ast:"HoT維持 / 移動優先",note:"7:49〜8:15圧縮"},
+ {t:501,phase:"P3",name:"エラプション / ウォタガ / シャドウアイ",ast:"散開後戻し",note:""},
+ {t:505,phase:"P3",name:"シェルクラッシャー",ast:"単体ケア",note:""},
+ {t:513,phase:"P3",name:"ショックウェーブ・パルサー",ast:"範囲戻し",note:""},
+ {t:521,phase:"P3",name:"ブラックヘイロー",ast:"タンクケア",note:""},
+ {t:530,phase:"P3",name:"ディレイスペル・リフレイン",ast:"処理確認",note:""},
+ {t:546,phase:"P3",name:"アポカリプス処理",ast:"移動優先 / 必要時迅速戻し",note:"9:06〜9:24圧縮"},
+ {t:571,phase:"P3",name:"暗夜の舞踏技×2",ast:"単体/範囲確認",note:""},
+ {t:577,phase:"P3",name:"ダークウォタガ",ast:"散開確認",note:""},
+ {t:583,phase:"P3",name:"ショックウェーブ・パルサー",ast:"範囲戻し",note:""},
+ {t:596,phase:"P3",name:"エンド・オブ・メモリーズ",ast:"軽減 / 戻し厚め",note:""},
+ {t:608,phase:"Phase",name:"P4開始",ast:"カード準備",note:"フェーズ切替"},
+
+ {t:613,phase:"P4",name:"具象化",ast:"事前準備",note:""},
+ {t:624,phase:"P4",name:"ドラゴンアーマー",ast:"軽減確認",note:""},
+ {t:627,phase:"P4",name:"アク・ラーイ",ast:"範囲戻し",note:""},
+ {t:639,phase:"P4",name:"光と闇の竜詩",ast:"処理中HoT維持",note:""},
+ {t:651,phase:"P4",name:"光の波動",ast:"戻し厚め",note:""},
+ {t:658,phase:"P4",name:"ホーリーウィング",ast:"頭割りケア",note:""},
+ {t:661,phase:"P4",name:"宵闇の舞踏技×2",ast:"単体ケア",note:""},
+ {t:675,phase:"P4",name:"アク・モーン×4",ast:"連続戻し / スター起爆候補",note:""},
+ {t:685,phase:"P4",name:"モーン・アファー",ast:"範囲軽減",note:""},
+ {t:700,phase:"P4",name:"時間結晶",ast:"マクロコスモス候補",note:""},
+ {t:715,phase:"P4",name:"聖竜気 / メイルシュトローム / ダークホーリー",ast:"軽減確認",note:""},
+ {t:722,phase:"P4",name:"光の大波 1方向目",ast:"移動優先",note:""},
+ {t:728,phase:"P4",name:"光の大波 2方向目",ast:"移動後ケア",note:""},
+ {t:732,phase:"P4",name:"クワイタス×3",ast:"範囲戻し",note:""},
+ {t:738,phase:"P4",name:"スピリットテイカー",ast:"単体確認",note:""},
+ {t:743,phase:"P4",name:"ホーリーウィング×2",ast:"頭割りケア",note:""},
+ {t:758,phase:"P4",name:"アク・モーン×4",ast:"連続戻し",note:""},
+ {t:766,phase:"P4",name:"忘却の彼方",ast:"戻し確認",note:""},
+ {t:768,phase:"P4",name:"モーン・アファー",ast:"範囲軽減",note:""},
+ {t:780,phase:"Phase",name:"P5移行演出",ast:"バースト温存 / MP回復",note:"長演出"},
+ {t:862,phase:"P5",name:"P5開始",ast:"カード準備 / 薬確認",note:""},
+
+ {t:870,phase:"P5",name:"光塵の剣",ast:"軽減確認",note:""},
+ {t:881,phase:"P5",name:"光塵の剣 発動開始",ast:"範囲戻し準備",note:""},
+ {t:897,phase:"P5",name:"アク・モーン",ast:"連続戻し",note:""},
+ {t:900,phase:"P5",name:"攻撃",ast:"単体確認",note:""},
+ {t:905,phase:"P5",name:"パラダイス・リゲインド",ast:"移動準備",note:""},
+ {t:915,phase:"P5",name:"爆発 + 光と闇の片翼",ast:"範囲戻し",note:""},
+ {t:936,phase:"P5",name:"星霊の剣",ast:"軽減確認",note:""},
+ {t:937,phase:"P5",name:"重波動×4",ast:"連続戻し",note:""},
+ {t:970,phase:"P5",name:"パンドラの櫃",ast:"大戻し / マクロコスモス候補",note:""},
+ {t:983,phase:"P5",name:"光塵の剣",ast:"軽減確認",note:""},
+ {t:994,phase:"P5",name:"光塵の剣 発動開始",ast:"範囲戻し準備",note:""},
+ {t:1010,phase:"P5",name:"アク・モーン",ast:"連続戻し",note:""},
+ {t:1022,phase:"P5",name:"パラダイス・リゲインド",ast:"移動準備",note:""},
+ {t:1032,phase:"P5",name:"爆発 + 光と闇の片翼",ast:"範囲戻し",note:""},
+ {t:1048,phase:"P5",name:"星霊の剣",ast:"軽減確認",note:""},
+ {t:1049,phase:"P5",name:"重波動×4",ast:"連続戻し",note:""},
+ {t:1073,phase:"P5",name:"光塵の剣",ast:"軽減確認",note:""},
+ {t:1084,phase:"P5",name:"光塵の剣 発動開始",ast:"最終戻し準備",note:""},
+ {t:1100,phase:"P5",name:"アク・モーン",ast:"最後の連続戻し",note:""},
+ {t:1130,phase:"P5",name:"パラダイス・ロスト",ast:"時間切れ",note:""}
+].sort((a,b)=>a.t-b.t);
+
+let timeline=JSON.parse(localStorage.getItem("fruAstTimeline")||"null")||defaultTimeline;
+let elapsed=START_AT,timer=null,countdown=null,running=false,lastNextKey="";
+const q=id=>document.getElementById(id);
+const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+const total=()=>Math.max(...timeline.map(e=>e.t),1);
+
+function buildDisplayTimeline(source){
+  const noBurst=source.filter(e=>!String(e.name).includes("バースト") && e.phase!=="Burst");
+  const result=[];
+  for(const e of noBurst){
+    const prev=result[result.length-1];
+    if(prev && e.t-prev.t<5) continue;
+    result.push(e);
+  }
+  return result;
+}
+
+function getBurstState(){
+  if(!hasStarted)return {mode:"ready"};
+  const active=[...burstTimeline].filter(b=>elapsed>=b.t && elapsed<b.t+10).pop();
+  if(active)return {mode:"now",label:active.label};
+  const next=burstTimeline.find(b=>b.t>elapsed);
+  if(!next)return {mode:"done"};
+  const remain=next.t-elapsed;
+  return {mode:remain<=10?"soon":"normal",remain,label:next.label};
+}
+
+function setNextNameSize(name){
+  const el=q("nextName");
+  const len=name.length;
+  el.style.fontSize=len>28?"20px":len>22?"24px":len>16?"32px":len>10?"42px":"";
+}
+
+function render(){
+  const displayTimeline=buildDisplayTimeline(timeline);
+  const now=[...displayTimeline].filter(e=>e.t<=elapsed).pop();
+  const next=displayTimeline.find(e=>e.t>elapsed);
+  const enemyRemain=next?Math.max(0,next.t-elapsed):0;
+  const nextName=next?next.name:"なし";
+
+  q("phase").textContent=(now||next||{}).phase||"-";
+  q("nextName").textContent=nextName;
+  setNextNameSize(nextName);
+  q("nextMeta").textContent=next?`${fmt(next.t)} / ${next.phase}`:"-";
+  q("nextAst").textContent=next?`AST: ${next.ast}`:"AST: -";
+  q("enemyCountdown").textContent=next?fmt(enemyRemain):"--:--";
+  q("enemyCountdown").classList.toggle("urgent",enemyRemain<=5 && !!next);
+  q("elapsedMini").textContent=`経過 ${fmt(elapsed)} / ${fmt(total())}`;
+  q("bar").style.width=Math.min(100,elapsed/total()*100)+"%";
+  q("json").value=JSON.stringify(timeline,null,2);
+
+  const nextKey=next?`${next.t}-${next.name}`:"none";
+  if(nextKey!==lastNextKey){
+    q("nextHud").classList.remove("flip");
+    void q("nextHud").offsetWidth;
+    q("nextHud").classList.add("flip");
+    lastNextKey=nextKey;
+  }
+
+  renderBurst();
+  q("currentCard").innerHTML=nowCard(now);
+
+  q("timeline").innerHTML=displayTimeline.map(e=>{
+    const cls=e===now?"now":e===next?"next":"";
+    return `<div class="item ${cls}">
+      <div class="t">${fmt(e.t)}</div>
+      <div><span class="badge">${e.phase}</span></div>
+      <div><div class="name">${e.name}</div><div class="ast" style="text-align:left;font-size:15px">AST: ${e.ast}</div></div>
+      <div class="small">${e.note||""}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderBurst(){
+  const state=getBurstState();
+  const box=q("burstHud");
+  box.classList.toggle("preBurst",state.mode==="soon");
+  box.classList.toggle("burstNow",state.mode==="now");
+
+  if(state.mode==="ready"){
+    q("burstLabel").textContent="BURST";
+    q("burstTime").textContent="READY";
+    q("burstSub").textContent="開始前";
+  }else if(state.mode==="now"){
+    q("burstLabel").textContent="ATTACK";
+    q("burstTime").textContent="BURST!";
+    q("burstSub").textContent=state.label;
+  }else if(state.mode==="soon"){
+    q("burstLabel").textContent="BURST SOON";
+    q("burstTime").textContent=fmt(state.remain);
+    q("burstSub").textContent=state.label;
+  }else if(state.mode==="done"){
+    q("burstLabel").textContent="BURST";
+    q("burstTime").textContent="DONE";
+    q("burstSub").textContent="完了";
+  }else{
+    q("burstLabel").textContent="BURST";
+    q("burstTime").textContent=fmt(state.remain);
+    q("burstSub").textContent=state.label;
+  }
+}
+
+function nowCard(e){
+  if(!e){
+    return `<div class="nowCard">
+      <div class="nowGrid">
+        <div class="nowTime">00:00</div>
+        <div><div class="small">NOW</div><div class="nowName">開幕バースト</div></div>
+        <div><div class="ast">AST: ディヴィネーション / カード配布 / コンバガ</div><div class="small">戦闘開始準備</div></div>
+      </div>
+    </div>`;
+  }
+  return `<div class="nowCard">
+    <div class="nowGrid">
+      <div class="nowTime">${fmt(e.t)}</div>
+      <div><div class="small">NOW</div><div class="nowName">${e.name}</div></div>
+      <div><div class="ast">AST: ${e.ast}</div><div class="small">${e.note||""}</div></div>
+    </div>
+  </div>`;
+}
+
+function stop(){clearInterval(timer);timer=null;running=false}
+function run(){if(timer)return;running=true;timer=setInterval(()=>{elapsed++;render()},1000)}
+function resetKeys(){lastNextKey=""}
+
+q("start").onclick=()=>{
+  stop();clearInterval(countdown);elapsed=START_AT;resetKeys();render();
+  let c=3;q("count").textContent=c;
+  countdown=setInterval(()=>{
+    c--;q("count").textContent=c>0?c:"START";
+    if(c<=0){clearInterval(countdown);hasStarted=true;setTimeout(()=>q("count").textContent="",500);run()}
+  },1000);
+};
+q("pause").onclick=()=>running?stop():run();
+q("reset").onclick=()=>{hasStarted=false;stop();clearInterval(countdown);elapsed=START_AT;q("count").textContent="";resetKeys();render()};
+q("back").onclick=()=>{elapsed=Math.max(START_AT,elapsed-5);resetKeys();render()};
+q("forward").onclick=()=>{elapsed+=5;resetKeys();render()};
+q("apply").onclick=()=>{timeline=JSON.parse(q("json").value).sort((a,b)=>a.t-b.t);resetKeys();render()};
+q("save").onclick=()=>{localStorage.setItem("fruAstTimeline",JSON.stringify(timeline));alert("保存しました")};
+q("default").onclick=()=>{hasStarted=false;timeline=defaultTimeline;localStorage.removeItem("fruAstTimeline");elapsed=START_AT;resetKeys();render()};
+
+render();
+</script>
+</body>
+</html>
