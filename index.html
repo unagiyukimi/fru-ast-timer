@@ -36,7 +36,17 @@ button.primary{background:linear-gradient(135deg,#6d4cff,#f6d365);color:#120b22}
 .nextHud::after{content:"";position:absolute;right:58px;top:50%;width:142px;height:142px;border-radius:50%;border:1px dashed rgba(246,211,101,.22);transform:translateY(-50%);pointer-events:none;opacity:.65;animation:ringSpin 26s linear infinite}
 .nextHud.flip{animation:nextFlip 1.35s cubic-bezier(.16,.84,.24,1) both}
 .nextContent{position:relative;z-index:1}
-.nextName{font-size:clamp(20px,4vw,52px);font-weight:950;margin:4px 0;line-height:1.05;height:2.2em;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.nextName{
+  font-weight:950;
+  margin:4px 0;
+  line-height:1.05;
+  height:2.2em;
+  display:block;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:100%;
+}
 .nextMeta{color:var(--muted);font-size:14px}
 .nextAst{color:var(--gold);font-weight:900;font-size:20px;margin-top:6px}
 .enemyCountdown{font-family:monospace;font-size:clamp(42px,8vw,78px);font-weight:950;color:var(--gold);line-height:1}
@@ -278,16 +288,22 @@ function getBurstState(){
 }
 
 function setNextNameSize(name){
-  const el=q("nextName");
-  const len=name.length;
-  el.style.fontSize =
-    len > 28 ? "20px" :
-    len > 22 ? "24px" :
-    len > 16 ? "30px" :
-    len > 10 ? "34px" :
-    "38px";
-}
+  const el = q("nextName");
 
+  el.style.fontSize = "";
+  el.style.whiteSpace = "nowrap";
+
+  let size = window.innerWidth <= 820 ? 38 : 52;
+  el.style.fontSize = size + "px";
+
+  requestAnimationFrame(()=>{
+    const maxWidth = el.clientWidth;
+    while(el.scrollWidth > maxWidth && size > 18){
+      size -= 2;
+      el.style.fontSize = size + "px";
+    }
+  });
+}
 function render(){
   const displayTimeline=buildDisplayTimeline(timeline);
   const now=[...displayTimeline].filter(e=>e.t<=elapsed).pop();
